@@ -122,6 +122,7 @@ def audio_to_command(wav_path: str) -> str | None:
         vad_filter=True
     )
 
+
     recognized_text = " ".join(segment.text for segment in segments)
     normalized_text = normalize_text(recognized_text)
 
