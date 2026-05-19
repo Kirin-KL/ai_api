@@ -5,10 +5,12 @@ starlette==1.0.0
 pydantic==2.13.4
 PyJWT==2.12.1
 passlib==1.7.4
-torch==2.8.0
 soundfile==0.13.1
 keras==3.12.1
 tensorflow==2.21.0
 librosa==0.11.0
 numpy==2.2.6
 pydub==0.25.1
+torch==2.4.0
+torchaudio==2.4.0 --index-url https://download.pytorch.org/whl/cpu
+faster-whisper

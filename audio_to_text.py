@@ -45,6 +45,144 @@ import time
 from pydub import AudioSegment
 import librosa
 import numpy as np
+from pathlib import Path
+
+
+
+# Временный вариант +++++++++++++
+
+from pathlib import Path
+from difflib import get_close_matches
+from faster_whisper import WhisperModel
+
+
+COMMANDS = [
+    "Да",
+    "Нет",
+    "Вода",
+    "Электричество",
+    "Оператор",
+    "Задолжность",
+]
+
+
+COMMAND_ALIASES = {
+    "Да": [
+        "да",
+        "ага",
+    ],
+    "Нет": [
+        "нет",
+        "не",
+    ],
+    "Вода": [
+        "вода",
+        "воды",
+        "воду",
+    ],
+    "Электричество": [
+        "электричество",
+        "электричества",
+        "свет",
+        "электроэнергия",
+    ],
+    "Оператор": [
+        "оператор",
+        "оператора",
+        "соедините с оператором",
+    ],
+    "Задолжность": [
+        "задолжность",
+        "задолженность",
+        "долг",
+        "задолженности",
+    ],
+}
+
+
+model = WhisperModel(
+    "small",
+    device="cpu",
+    compute_type="int8"
+)
+
+
+def audio_to_command(wav_path: str) -> str | None:
+    path = Path(wav_path)
+
+    if not path.exists():
+        raise FileNotFoundError(f"Файл не найден: {wav_path}")
+
+    if path.suffix.lower() != ".wav":
+        raise ValueError("Функция принимает только WAV-файлы")
+
+    segments, info = model.transcribe(
+        str(path),
+        language="ru",
+        beam_size=5,
+        vad_filter=True
+    )
+
+    recognized_text = " ".join(segment.text for segment in segments)
+    normalized_text = normalize_text(recognized_text)
+
+    if not normalized_text:
+        return None
+
+    # 1. Точное совпадение всей фразы
+    for command, aliases in COMMAND_ALIASES.items():
+        for alias in aliases:
+            normalized_alias = normalize_text(alias)
+
+            if normalized_text == normalized_alias:
+                return command
+
+    # 2. Совпадение по словам, а не по подстроке
+    words = normalized_text.split()
+
+    for command, aliases in COMMAND_ALIASES.items():
+        for alias in aliases:
+            normalized_alias = normalize_text(alias)
+
+            if " " not in normalized_alias and normalized_alias in words:
+                return command
+
+    # 3. Нечёткое сравнение
+    all_aliases = []
+    alias_to_command = {}
+
+    for command, aliases in COMMAND_ALIASES.items():
+        for alias in aliases:
+            normalized_alias = normalize_text(alias)
+            all_aliases.append(normalized_alias)
+            alias_to_command[normalized_alias] = command
+
+    best_matches = get_close_matches(
+        normalized_text,
+        all_aliases,
+        n=1,
+        cutoff=0.85
+    )
+
+    if best_matches:
+        return alias_to_command[best_matches[0]]
+
+    return None
+
+
+def normalize_text(text: str) -> str:
+    return (
+        text.lower()
+        .replace("ё", "е")
+        .replace(".", "")
+        .replace(",", "")
+        .replace("!", "")
+        .replace("?", "")
+        .replace(":", "")
+        .replace(";", "")
+        .strip()
+    )
+# Временный вариант +++++++++++++++++++++++
 
 # Общие аудио-константы
 SAMPLE_RATE = 16000
@@ -187,66 +325,66 @@ def safe_load_audio_for_commands(path):
     return y
 
 # Распознавание команд
-def audio_to_command(file_wav, model=model_command):
-    """
-    Распознаёт команду в аудио любой длины.
-    Использует VAD → классифицирует каждый фрагмент → выбирает лучший.
-    """
-
-    file_wav = str(file_wav)
-
-    # --- 1. Загружаем аудио ---
-    audio = AudioSegment.from_wav(file_wav)
-    audio = audio.set_frame_rate(SAMPLE_RATE)
-    audio = audio.set_channels(1)
-    audio = audio.set_sample_width(2)
-
-    # --- 2. Ищем фрагменты речи ---
-    timestamps = find_speech_fragments(file_wav)
-    print(timestamps)
-
-    if len(timestamps) == 0:
-        return None, None  # нет речи
-
-    best_prob = -1
-    best_command = None
-    best_full_probs = None
-
-    # --- 3. Обрабатываем каждый фрагмент ---
-    for t in timestamps:
-        start_ms = int(t["start"] * 1000)
-        end_ms   = int(t["end"] * 1000)
-
-        segment = audio[start_ms:end_ms]
-
-        samples = audiosegment_to_np(segment)
-
-        # Приводим к 2 секундам (как в обучении)
-        samples = fix_length(samples, SAMPLES_COMMANDS)
-
-        # Мел-спектр с hop_length=512
-        spec = audio_to_melspec_generic(
-            samples,
-            sample_rate=SAMPLE_RATE,
-            n_mels=N_MELS,
-            n_fft=N_FFT,
-            hop_length=HOP_LENGTH_COMMANDS
-        )
-
-        model_input = prepare_input_for_model(spec)
-
-        probs = model.predict(model_input, verbose=0)[0]
-        pred_idx = np.argmax(probs)
-        pred_prob = probs[pred_idx]
-        pred_command = COMMAND_CLASSES[pred_idx]
-
-        # --- 4. Выбираем фрагмент с максимальной уверенностью ---
-        if pred_prob > best_prob:
-            best_prob = pred_prob
-            best_command = pred_command
-            best_full_probs = probs
-
-    return best_command, best_full_probs
+# def audio_to_command(file_wav, model=model_command):
+#     """
+#     Распознаёт команду в аудио любой длины.
+#     Использует VAD → классифицирует каждый фрагмент → выбирает лучший.
+#     """
+#
+#     file_wav = str(file_wav)
+#
+#     # --- 1. Загружаем аудио ---
+#     audio = AudioSegment.from_wav(file_wav)
+#     audio = audio.set_frame_rate(SAMPLE_RATE)
+#     audio = audio.set_channels(1)
+#     audio = audio.set_sample_width(2)
+#
+#     # --- 2. Ищем фрагменты речи ---
+#     timestamps = find_speech_fragments(file_wav)
+#     print(timestamps)
+#
+#     if len(timestamps) == 0:
+#         return None, None  # нет речи
+#
+#     best_prob = -1
+#     best_command = None
+#     best_full_probs = None
+#
+#     # --- 3. Обрабатываем каждый фрагмент ---
+#     for t in timestamps:
+#         start_ms = int(t["start"] * 1000)
+#         end_ms   = int(t["end"] * 1000)
+#
+#         segment = audio[start_ms:end_ms]
+#
+#         samples = audiosegment_to_np(segment)
+#
+#         # Приводим к 2 секундам (как в обучении)
+#         samples = fix_length(samples, SAMPLES_COMMANDS)
+#
+#         # Мел-спектр с hop_length=512
+#         spec = audio_to_melspec_generic(
+#             samples,
+#             sample_rate=SAMPLE_RATE,
+#             n_mels=N_MELS,
+#             n_fft=N_FFT,
+#             hop_length=HOP_LENGTH_COMMANDS
+#         )
+#
+#         model_input = prepare_input_for_model(spec)
+#
+#         probs = model.predict(model_input, verbose=0)[0]
+#         pred_idx = np.argmax(probs)
+#         pred_prob = probs[pred_idx]
+#         pred_command = COMMAND_CLASSES[pred_idx]
+#
+#         # --- 4. Выбираем фрагмент с максимальной уверенностью ---
+#         if pred_prob > best_prob:
+#             best_prob = pred_prob
+#             best_command = pred_command
+#             best_full_probs = probs
+#
+#     return best_command, best_full_probs
 
 
 # command, prob = audio_to_command_vad_best("neural_network/Исходные записи/Вода_абра.wav")
