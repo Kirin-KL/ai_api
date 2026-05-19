@@ -65,7 +65,6 @@ COMMANDS = [
     "Задолжность",
 ]
 
-
 COMMAND_ALIASES = {
     "Да": [
         "да",
