@@ -66,6 +66,7 @@ COMMANDS = [
 ]
 
 
+
 COMMAND_ALIASES = {
     "Да": [
         "да",
