@@ -20,7 +20,7 @@ def speak(text, output_path="output_silero/tts.wav", speaker="kseniya", overwrit
     audio = model.apply_tts(
         text=text,
         speaker=speaker,
-        sample_rate=48000
+        sample_rate=8000
     )
 
     output_path = Path(output_path)
