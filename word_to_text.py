@@ -16,6 +16,7 @@ model, _ = torch.hub.load(
 print("Модель для озвучивания загружена!")
 
 
+
 def speak(text, output_path="output_silero/tts.wav", speaker="kseniya", overwrite=False):
     audio = model.apply_tts(
         text=text,
