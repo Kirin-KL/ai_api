@@ -49,140 +49,326 @@ from pathlib import Path
 
 
 
-# Временный вариант +++++++++++++
+# # Временный вариант +++++++++++++
 
+# from pathlib import Path
+# from difflib import get_close_matches
+# from faster_whisper import WhisperModel
+#
+#
+# COMMANDS = [
+#     "Да",
+#     "Нет",
+#     "Вода",
+#     "Электричество",
+#     "Оператор",
+#     "Задолжность",
+# ]
+#
+# COMMAND_ALIASES = {
+#     "Да": [
+#         "да",
+#         "ага",
+#     ],
+#     "Нет": [
+#         "нет",
+#         "не",
+#     ],
+#     "Вода": [
+#         "вода",
+#         "воды",
+#         "воду",
+#     ],
+#     "Электричество": [
+#         "электричество",
+#         "электричества",
+#         "свет",
+#         "электроэнергия",
+#     ],
+#     "Оператор": [
+#         "оператор",
+#         "оператора",
+#         "соедините с оператором",
+#     ],
+#     "Задолжность": [
+#         "задолжность",
+#         "задолженность",
+#         "долг",
+#         "задолженности",
+#     ],
+# }
+#
+#
+# model = WhisperModel(
+#     "small",
+#     device="cpu",
+#     compute_type="int8"
+# )
+#
+#
+# def audio_to_command(wav_path: str) -> str | None:
+#     path = Path(wav_path)
+#
+#     if not path.exists():
+#         raise FileNotFoundError(f"Файл не найден: {wav_path}")
+#
+#     if path.suffix.lower() != ".wav":
+#         raise ValueError("Функция принимает только WAV-файлы")
+#
+#     segments, info = model.transcribe(
+#         str(path),
+#         language="ru",
+#         beam_size=5,
+#         vad_filter=True
+#     )
+#
+#
+#     recognized_text = " ".join(segment.text for segment in segments)
+#     normalized_text = normalize_text(recognized_text)
+#
+#     if not normalized_text:
+#         return None
+#
+#     # 1. Точное совпадение всей фразы
+#     for command, aliases in COMMAND_ALIASES.items():
+#         for alias in aliases:
+#             normalized_alias = normalize_text(alias)
+#
+#             if normalized_text == normalized_alias:
+#                 return command
+#
+#     # 2. Совпадение по словам, а не по подстроке
+#     words = normalized_text.split()
+#
+#     for command, aliases in COMMAND_ALIASES.items():
+#         for alias in aliases:
+#             normalized_alias = normalize_text(alias)
+#
+#             if " " not in normalized_alias and normalized_alias in words:
+#                 return command
+#
+#     # 3. Нечёткое сравнение
+#     all_aliases = []
+#     alias_to_command = {}
+#
+#     for command, aliases in COMMAND_ALIASES.items():
+#         for alias in aliases:
+#             normalized_alias = normalize_text(alias)
+#             all_aliases.append(normalized_alias)
+#             alias_to_command[normalized_alias] = command
+#
+#     best_matches = get_close_matches(
+#         normalized_text,
+#         all_aliases,
+#         n=1,
+#         cutoff=0.85
+#     )
+#
+#     if best_matches:
+#         return alias_to_command[best_matches[0]]
+#
+#     return None
+#
+#
+# def normalize_text(text: str) -> str:
+#     return (
+#         text.lower()
+#         .replace("ё", "е")
+#         .replace(".", "")
+#         .replace(",", "")
+#         .replace("!", "")
+#         .replace("?", "")
+#         .replace(":", "")
+#         .replace(";", "")
+#         .strip()
+#     )
+# # Временный вариант +++++++++++++++++++++++
+
+
+# # Временный вариант 2 +++++++++++++++++++++++
 from pathlib import Path
-from difflib import get_close_matches
 from faster_whisper import WhisperModel
+import pymorphy3
+from rapidfuzz import process, fuzz
 
+# ── Константы ────────────────────────────────────────────────────────────────
 
-COMMANDS = [
-    "Да",
-    "Нет",
-    "Вода",
-    "Электричество",
-    "Оператор",
-    "Задолжность",
-]
+COMMANDS: dict[str, str] = {
+    "Да":            "Д",
+    "Нет":           "Н",
+    "Вода":          "В",
+    "Электричество": "Э",
+    "Задолжность":   "З",
+    "Оператор":      "О",
+}
 
-COMMAND_ALIASES = {
+# Псевдонимы — слова/фразы, которые Whisper может вернуть вместо команды.
+# Ключи после нормализации (lower + замена ё→е + удаление пунктуации).
+COMMAND_ALIASES: dict[str, list[str]] = {
     "Да": [
-        "да",
-        "ага",
+        "да", "ага", "конечно", "верно",
     ],
     "Нет": [
-        "нет",
-        "не",
+        "нет", "не", "нету",
     ],
     "Вода": [
-        "вода",
-        "воды",
-        "воду",
+        "вода", "воды", "воду", "водой", "воде",
     ],
     "Электричество": [
-        "электричество",
-        "электричества",
-        "свет",
-        "электроэнергия",
-    ],
-    "Оператор": [
-        "оператор",
-        "оператора",
-        "соедините с оператором",
+        "электричество", "электричества", "электричеству",
+        "электричеством", "электроэнергия", "электроэнергии",
+        "свет", "света",
     ],
     "Задолжность": [
-        "задолжность",
-        "задолженность",
-        "долг",
-        "задолженности",
+        "задолженность", "задолженности", "задолженностью",
+        "задолжность", "задолжности",
+        "долг", "долга", "долги",
+    ],
+    "Оператор": [
+        "оператор", "оператора", "оператору",
+        "оператором", "операторе",
+        "соедините с оператором",
     ],
 }
 
-
-model = WhisperModel(
-    "small",
-    device="cpu",
-    compute_type="int8"
+# Подсказка для Whisper — перечисляем ожидаемые слова,
+# чтобы модель "знала" словарь заранее.
+WHISPER_PROMPT = (
+    "Голосовое меню. Возможные команды: "
+    "Да, Нет, Вода, Электричество, Задолжность, Оператор."
 )
 
+# Нормальные формы (леммы) для каждой команды — строим один раз при старте.
+# pymorphy3 приводит любую словоформу к начальной форме.
+_morph = pymorphy3.MorphAnalyzer()
+
+
+def _lemmatize(word: str) -> str:
+    """Возвращает наиболее вероятную лемму слова."""
+    return _morph.parse(word)[0].normal_form  # parse возвращает список гипотез
+
+
+# Словарь: лемма → код команды
+LEMMA_TO_CODE: dict[str, str] = {}
+
+for _cmd, _aliases in COMMAND_ALIASES.items():
+    _code = COMMANDS[_cmd]
+    for _alias in _aliases:
+        # Лемматизируем каждое слово фразы, склеиваем обратно
+        _lemma_phrase = " ".join(_lemmatize(w) for w in _alias.split())
+        LEMMA_TO_CODE[_lemma_phrase] = _code
+
+# ── Модель ───────────────────────────────────────────────────────────────────
+
+# large-v3 — наилучшее качество для русского языка.
+# Если ресурсы ограничены — можно использовать "medium" (компромисс).
+model = WhisperModel(
+    "small",
+    device="cpu",        # замените на "cuda" при наличии GPU
+    compute_type="int8", # int8 — оптимально для CPU; для GPU лучше "float16"
+)
+
+# ── Вспомогательные функции ──────────────────────────────────────────────────
+
+def normalize_text(text: str) -> str:
+    """Нижний регистр, ё→е, удаление пунктуации, лишних пробелов."""
+    result = (
+        text.lower()
+        .replace("ё", "е")
+        .replace(".", "").replace(",", "").replace("!", "")
+        .replace("?", "").replace(":", "").replace(";", "")
+        .replace("-", " ")
+    )
+    return " ".join(result.split())  # схлопываем множественные пробелы
+
+
+def lemmatize_phrase(phrase: str) -> str:
+    """Лемматизирует каждое слово фразы и возвращает результат строкой."""
+    return " ".join(_lemmatize(w) for w in phrase.split())
+
+
+def transcribe(wav_path: str) -> str:
+    """
+    Транскрибирует WAV-файл и возвращает нормализованный текст.
+    Возвращает пустую строку, если речь не обнаружена.
+    """
+    segments, _ = model.transcribe(
+        wav_path,
+        language="ru",
+        initial_prompt=WHISPER_PROMPT,  # ключевое улучшение
+        beam_size=10,                   # шире луч → точнее результат
+        best_of=5,                      # число кандидатов при temperature > 0
+        temperature=0.0,                # детерминированный режим (без случайности)
+        condition_on_previous_text=False,
+        vad_filter=True,
+        vad_parameters={
+            "min_silence_duration_ms": 300,
+            "speech_pad_ms": 200,
+        },
+        no_speech_threshold=0.6,        # сегменты с p(тишина) > 0.6 отбрасываем
+        log_prob_threshold=-1.0,        # отбрасываем совсем неуверенные сегменты
+    )
+
+    raw = " ".join(seg.text for seg in segments)
+    return normalize_text(raw)
+
+
+# ── Основная функция ─────────────────────────────────────────────────────────
 
 def audio_to_command(wav_path: str) -> str | None:
+    """
+    Принимает путь к WAV-файлу (≈6 с), возвращает код команды:
+        'Д' | 'Н' | 'В' | 'Э' | 'З' | 'О'  — распознанная команда
+        None                                  — команда не определена
+
+    Raises:
+        FileNotFoundError: файл не найден.
+        ValueError:        файл не является WAV.
+    """
     path = Path(wav_path)
 
     if not path.exists():
         raise FileNotFoundError(f"Файл не найден: {wav_path}")
-
     if path.suffix.lower() != ".wav":
         raise ValueError("Функция принимает только WAV-файлы")
 
-    segments, info = model.transcribe(
-        str(path),
-        language="ru",
-        beam_size=5,
-        vad_filter=True
-    )
-
-
-    recognized_text = " ".join(segment.text for segment in segments)
-    normalized_text = normalize_text(recognized_text)
+    normalized_text = transcribe(str(path))
 
     if not normalized_text:
         return None
 
-    # 1. Точное совпадение всей фразы
-    for command, aliases in COMMAND_ALIASES.items():
-        for alias in aliases:
-            normalized_alias = normalize_text(alias)
+    lemmatized_text = lemmatize_phrase(normalized_text)
 
-            if normalized_text == normalized_alias:
-                return command
+    # ── Шаг 1: точное совпадение по лемме всей фразы ─────────────────────────
+    if lemmatized_text in LEMMA_TO_CODE:
+        return LEMMA_TO_CODE[lemmatized_text]
 
-    # 2. Совпадение по словам, а не по подстроке
-    words = normalized_text.split()
+    # ── Шаг 2: совпадение по отдельным словам фразы ──────────────────────────
+    # Проверяем каждое слово — вдруг Whisper добавил лишнее слово вокруг команды.
+    for word in lemmatized_text.split():
+        if word in LEMMA_TO_CODE:
+            return LEMMA_TO_CODE[word]
 
-    for command, aliases in COMMAND_ALIASES.items():
-        for alias in aliases:
-            normalized_alias = normalize_text(alias)
-
-            if " " not in normalized_alias and normalized_alias in words:
-                return command
-
-    # 3. Нечёткое сравнение
-    all_aliases = []
-    alias_to_command = {}
-
-    for command, aliases in COMMAND_ALIASES.items():
-        for alias in aliases:
-            normalized_alias = normalize_text(alias)
-            all_aliases.append(normalized_alias)
-            alias_to_command[normalized_alias] = command
-
-    best_matches = get_close_matches(
-        normalized_text,
-        all_aliases,
-        n=1,
-        cutoff=0.85
+    # ── Шаг 3: нечёткое сравнение (rapidfuzz) ────────────────────────────────
+    # Сравниваем лемматизированный текст со всеми ключами словаря.
+    match = process.extractOne(
+        lemmatized_text,
+        LEMMA_TO_CODE.keys(),
+        scorer=fuzz.WRatio,   # взвешенный ratio — лучший выбор для коротких фраз
+        score_cutoff=80,      # порог схожести 0–100
     )
 
-    if best_matches:
-        return alias_to_command[best_matches[0]]
+    if match:
+        matched_lemma, score, _ = match
+        return LEMMA_TO_CODE[matched_lemma]
 
     return None
+# Временный вариант 2 ++++++++++++++++++++++++
 
+# Временный вариант 3
 
-def normalize_text(text: str) -> str:
-    return (
-        text.lower()
-        .replace("ё", "е")
-        .replace(".", "")
-        .replace(",", "")
-        .replace("!", "")
-        .replace("?", "")
-        .replace(":", "")
-        .replace(";", "")
-        .strip()
-    )
-# Временный вариант +++++++++++++++++++++++
+# Временный вариант 3
+
 
 # Общие аудио-константы
 SAMPLE_RATE = 16000
