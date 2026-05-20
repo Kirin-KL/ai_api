@@ -421,6 +421,10 @@ async def get_objects(
         include_deleted=include_deleted,
     )
 
+    # Если результирующий массив пуст – возвращаем 404
+    if not objects:
+        raise HTTPException(status_code=404, detail="Объекты не найдены")
+
     return [schema.model_validate(obj) for obj in objects]
 
 
