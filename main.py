@@ -284,12 +284,12 @@ async def tts_wav(text: str, filename: str, cred: HTTPAuthorizationCredentials =
     output_path =  path / file_name
 
     # оборачиваем процесс озвучки в отдельный поток, чтобы он не тормозил выполнение
-    await run_in_threadpool(speak,text, output_path)
+    output_file_name =  await run_in_threadpool(speak,text, output_path)
 
     return FileResponse(
         path=output_path,
         media_type="audio/wav",
-        filename=file_name.name
+        filename=str(output_file_name)
     )
 
 
