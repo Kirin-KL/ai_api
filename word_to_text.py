@@ -34,7 +34,7 @@ def speak(text, output_path="output_silero/tts.wav", speaker="kseniya", overwrit
     # Создание папки, если её нет
     output_path.parent.mkdir(parents=True, exist_ok=True)
 
-    sf.write(str(output_path), audio.numpy(), 48000)
+    sf.write(str(output_path), audio.numpy(), 8000)
 
     print(f"Файл {output_path} создан!")
 
