@@ -205,10 +205,10 @@ class UserCreate(BaseModel):
 class UserActionRequest(BaseModel):
     action: Literal["update", "delete"]
 
-    full_name: str
-    nickname: str
-    email: str
-    password_hash: str
+    full_name: Optional[str] = None
+    nickname: Optional[str] = None
+    email: Optional[str] = None
+    password_hash: Optional[str] = None
 
 class UserResponse(BaseModel):
     model_config = ConfigDict(from_attributes=True)
@@ -217,7 +217,7 @@ class UserResponse(BaseModel):
     full_name: str
     nickname: str
     email: str
-    # password_hash: str
+    password_hash: str
     last_login_at: datetime
     deleted_at: Optional[datetime] = None
     created_at: Optional[datetime] = None

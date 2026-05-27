@@ -1,6 +1,6 @@
 from sqlalchemy import (
     Column, Integer, String, Boolean, DateTime, ForeignKey, Text,
-    UniqueConstraint, JSON
+    UniqueConstraint, JSON, Numeric
 )
 from sqlalchemy.orm import relationship
 from sqlalchemy.sql import func
@@ -126,7 +126,7 @@ class Reading(Base):
     id = Column(Integer, primary_key=True)
     meter_id = Column(Integer, ForeignKey("meters.id"))
     zone_id = Column(Integer, ForeignKey("zones.id"))
-    value = Column(Integer)
+    value = Column(Numeric(15, 3))
     date = Column(DateTime(timezone=True))
     submitted_by = Column(Integer, ForeignKey("clients.id"))
 

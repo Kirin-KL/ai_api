@@ -1301,7 +1301,7 @@ async def create_user(
 
     last_login = datetime.now() # TODO: при создании пользователя не надо устанавливать last_login
 
-    password_hash = await process_password(password=payload.password_hash.strip())
+    password_hash = process_password(password=payload.password_hash.strip())
 
     user = await db_crud.create_user(
         db=db,
@@ -1367,6 +1367,10 @@ async def change_user(
             )
 
         data["last_login_at"] = datetime.now()
+
+        if "password_hash" in data:
+            data["password_hash"] = process_password(data["password_hash"].strip())
+
 
         user = await db_crud.update_user(
             db=db,
